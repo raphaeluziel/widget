@@ -1,0 +1,4 @@
+<resources>
+    <!-- Compose draws the UI; this only sets the window background before the first frame. -->
+    <style name="Theme.NotesWidget" parent="android:Theme.Material.Light.NoActionBar" />
+</resources>

@@ -38,26 +38,21 @@ GET https://<MY_DOMAIN>/<notes-url-prefix>/widget/recent/?token=<TOKEN>
 403 -> bad/missing token
 ```
 
-Reference implementation on the Django side (for context only; do not edit the Django repo from here):
+The Django side lives in WSL (`Ubuntu` distro) at `/home/raphaeluziel/claude/notes`
+(from Windows: `\\wsl.localhost\Ubuntu\home\raphaeluziel\claude\notes`). Its own `CLAUDE.md`
+describes the endpoint implementation. Do not edit the Django repo from here.
 
-```python
-import hmac
-from django.conf import settings
-from django.http import JsonResponse, HttpResponseForbidden
-from .models import Note
+The real `Note` model has `text`, `details` and `created` (no title, no edit timestamp), so the
+server maps them onto the contract like this:
 
-def widget_recent(request):
-    token = request.GET.get("token", "")
-    if not hmac.compare_digest(token, settings.WIDGET_TOKEN):
-        return HttpResponseForbidden()
-    notes = Note.objects.order_by("-updated_at")[:5]
-    return JsonResponse({"notes": [
-        {"title": n.title, "preview": n.content[:120], "updated": n.updated_at.isoformat()}
-        for n in notes
-    ]})
-```
+- `title`   = `note.text`
+- `preview` = `note.details[:120]` (empty string when there are no details)
+- `updated` = `note.created.isoformat()` (`USE_TZ = True`, so it carries an offset)
 
-Notes on field names: confirm the real `Note` model fields before relying on them, and keep the JSON contract above stable.
+"Most recent" therefore means newest by creation, not last edited. Keep the JSON contract above stable.
+
+The notes pages require login (`@owner_required`); this endpoint deliberately doesn't, because the
+widget can't log in. The token is its only auth. Unset `WIDGET_TOKEN` on the server makes it 404.
 
 ## Requirements
 

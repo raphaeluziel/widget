@@ -1,0 +1,16 @@
+.gradle/
+.kotlin/
+/build/
+/captures/
+*.iml
+.DS_Store
+
+# Holds sdk.dir plus the notes base URL and widget token. Never commit it.
+local.properties
+
+/.idea/caches/
+/.idea/libraries/
+/.idea/workspace.xml
+/.idea/navEditor.xml
+/.idea/assetWizardSettings.xml
+/.idea/deploymentTargetSelector.xml

@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">Notes Widget</string>
+    <string name="widget_name">Notes</string>
+    <string name="widget_description">Your five most recent notes</string>
+</resources>

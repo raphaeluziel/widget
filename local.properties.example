@@ -1,0 +1,9 @@
+# Copy to local.properties (git-ignored) and fill in real values.
+# Android Studio adds sdk.dir to local.properties automatically.
+
+# Root of the notes app, HTTPS only, with a trailing slash. The widget fetches
+# <baseUrl>widget/recent/?token=... and opens <baseUrl> when tapped.
+notes.baseUrl=https://notes.example.com/notes/
+
+# Must match settings.WIDGET_TOKEN on the Django server. Treat it like a password.
+notes.widgetToken=replace-with-your-token
