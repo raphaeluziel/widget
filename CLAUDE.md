@@ -32,34 +32,42 @@ GET https://<MY_DOMAIN>/<notes-url-prefix>/widget/recent/?token=<TOKEN>
 200 OK
 {
   "notes": [
-    {"title": "string"}
+    {"title": "Buy milk", "size": "large", "color": "red", "bold": true, "italic": false}
   ]
 }
 403 -> bad/missing token
 ```
 
-The widget only reads `title`. Older servers also sent `preview` and `updated`; the app ignores
-unknown fields, so extra fields never break it, but removing `title` or `notes` would.
+- Every note is returned (any length), in the order arranged on the website. The widget never sorts.
+- `size`: "small" | "normal" | "large" | "xlarge" -> 12 / 14 / 17 / 20 sp.
+- `color`: "" (default text color) | "red" | "orange" | "green" | "blue" | "purple" | "pink" | "gray";
+  day uses the website's hex values, night lighter versions.
+- `bold`, `italic`: booleans for the whole note.
+
+The widget reads `title`, `size`, `color`, `bold` and `italic`. All but `title` have defaults
+("normal", "", false, false), and unknown size/color values render as the default, so older
+servers and cached state still decode. Older servers also sent `preview` and `updated`; the app
+ignores unknown fields, so extra fields never break it, but removing `title` or `notes` would.
+The authoritative field list is the "Android Home-Screen Widget" section of the Django notes CLAUDE.md.
 
 The Django side lives in WSL (`Ubuntu` distro) at `/home/raphaeluziel/claude/notes`
 (from Windows: `\\wsl.localhost\Ubuntu\home\raphaeluziel\claude\notes`). Its own `CLAUDE.md`
 describes the endpoint implementation. Do not edit the Django repo from here.
 
-The real `Note` model has `text`, `details` and `created` (no title, no edit timestamp). The server
-sends `title` = `note.text` for the 5 newest notes by `created`, so "most recent" means newest by
-creation, not last edited. Keep the JSON contract above stable.
+The server sends `title` = `note.text` for every note, in the order arranged on the website.
+Keep the JSON contract above stable.
 
 The notes pages require login (`@owner_required`); this endpoint deliberately doesn't, because the
 widget can't log in. The token is its only auth. Unset `WIDGET_TOKEN` on the server makes it 404.
 
 ## Requirements
 
-1. **Widget UI (Glance):** a list of the 5 most recent notes, showing only the note text (`title`, bold, up to 2 lines). No details/preview and no per-note time, even though the server still sends them. The header is "Raphi's Notes", centered, in a bigger font than the notes (22sp vs 14sp), with 18dp of space below it. No "updated X ago" line either; the header shows a subtle problem line only when a refresh failed ("offline", "couldn't refresh", "check token"). Handle empty, loading, and error states gracefully (keep showing last cached data).
+1. **Widget UI (Glance):** a scrolling list of all notes in the order received, showing only the note text (`title`, one line), styled per note by `size`, `color`, `bold` and `italic`. No details/preview and no per-note time. The header is "Raphi's Notes", centered, in a bigger font than the notes (22sp vs 14sp), with 18dp of space below it. No "updated X ago" line either; the header shows a subtle problem line only when a refresh failed ("offline", "couldn't refresh", "check token"). Handle empty, loading, and error states gracefully (keep showing last cached data).
 2. **Refresh:** `PeriodicWorkRequest` via WorkManager (15 minutes is the minimum interval). Also refresh once when the widget is first added. The worker fetches JSON, saves it to Glance state/DataStore, then calls `GlanceAppWidget.update`.
 3. **Caching:** persist the last successful response so the widget still shows notes with no network.
 4. **Tap actions:** only two 44dp-tall rounded-rectangle buttons in a row at the bottom of the widget are clickable: "Refresh" (left, light red) and "Details" (right, light green), which opens the notes site (`notes.baseUrl`) in the browser via `Intent.ACTION_VIEW`. Tapping notes or the header does nothing.
 5. **Config:** base URL and token come from `local.properties` (git-ignored) exposed through `BuildConfig` fields. A template `local.properties.example` should be committed with placeholder values.
-6. **Widget sizing and colors:** works at any home-screen size (the list simply fills the space). Sticky-note look: very light yellow background (`#FFF9C4`) with dark text by day, dark olive with light text in dark mode. Fixed colors, not Material You dynamic colors.
+6. **Widget sizing and colors:** works at any home-screen size (the list simply fills the space). Sticky-note look with two fixed palettes: light (very light yellow `#FFF9C4`, dark text) and dark (dark olive, light text, lighter note colors). A round ☾/☀ button at the top right toggles the widget's own light/dark mode; the choice is saved in DataStore (separately from the notes cache), defaults to light, and ignores the phone's dark theme. Not Material You dynamic colors.
 
 ## Security rules
 

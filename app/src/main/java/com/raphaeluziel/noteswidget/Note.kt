@@ -3,11 +3,20 @@ package com.raphaeluziel.noteswidget
 import kotlinx.serialization.Serializable
 
 /**
- * One entry of `GET <base>/widget/recent/`: just the note text. Any other fields the server
- * sends (older servers also sent `preview` and `updated`) are skipped by `ignoreUnknownKeys`.
+ * One entry of `GET <base>/widget/recent/`: the note text plus how to style it. The defaults let
+ * older servers and cached state from before styling existed still decode. Any other fields the
+ * server sends (older servers also sent `preview` and `updated`) are skipped by `ignoreUnknownKeys`.
  */
 @Serializable
-data class Note(val title: String)
+data class Note(
+    val title: String,
+    /** "small", "normal", "large" or "xlarge"; anything else renders as "normal". */
+    val size: String = "normal",
+    /** "" or "red", "orange", "green", "blue", "purple", "pink", "gray"; anything else renders as "". */
+    val color: String = "",
+    val bold: Boolean = false,
+    val italic: Boolean = false,
+)
 
 @Serializable
 data class NotesResponse(val notes: List<Note>)

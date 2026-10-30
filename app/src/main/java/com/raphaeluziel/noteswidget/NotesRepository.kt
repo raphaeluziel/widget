@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -25,8 +26,15 @@ private const val TAG = "NotesRepository"
 // DataStore must be a single instance per file, hence the top-level delegate.
 private val Context.notesDataStore: DataStore<Preferences> by preferencesDataStore("notes_cache")
 private val STATE_KEY = stringPreferencesKey("widget_state")
+// Kept apart from STATE_KEY because a successful refresh replaces the whole WidgetState.
+private val DARK_MODE_KEY = booleanPreferencesKey("dark_mode")
 
-private val json = Json { ignoreUnknownKeys = true }
+private val json = Json {
+    ignoreUnknownKeys = true
+    // A null for a field with a default (e.g. "color": null) falls back to the default
+    // instead of failing the whole refresh.
+    coerceInputValues = true
+}
 
 private val httpClient = OkHttpClient.Builder()
     .connectTimeout(15, TimeUnit.SECONDS)
@@ -39,6 +47,13 @@ class NotesRepository(context: Context) {
 
     val state: Flow<WidgetState> = dataStore.data.map { prefs ->
         prefs[STATE_KEY]?.let { decodeState(it) } ?: WidgetState()
+    }
+
+    /** The widget's own light/dark choice, independent of the phone's dark theme. Light by default. */
+    val darkMode: Flow<Boolean> = dataStore.data.map { prefs -> prefs[DARK_MODE_KEY] ?: false }
+
+    suspend fun toggleDarkMode() {
+        dataStore.edit { prefs -> prefs[DARK_MODE_KEY] = !(prefs[DARK_MODE_KEY] ?: false) }
     }
 
     /** Fetches and stores the result. Returns the new status; never throws for network errors. */
