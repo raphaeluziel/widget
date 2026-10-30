@@ -2,23 +2,19 @@ package com.raphaeluziel.noteswidget
 
 import android.content.Context
 import android.content.Intent
-import android.text.format.DateUtils
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.unit.DpSize
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.net.toUri
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
-import androidx.glance.GlanceTheme
-import androidx.glance.LocalSize
 import androidx.glance.action.Action
 import androidx.glance.action.ActionParameters
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
-import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.action.ActionCallback
 import androidx.glance.appwidget.action.actionRunCallback
 import androidx.glance.appwidget.action.actionStartActivity
@@ -28,6 +24,7 @@ import androidx.glance.appwidget.lazy.LazyColumn
 import androidx.glance.appwidget.lazy.items
 import androidx.glance.appwidget.provideContent
 import androidx.glance.background
+import androidx.glance.color.ColorProvider
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Box
 import androidx.glance.layout.Column
@@ -37,16 +34,26 @@ import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.height
 import androidx.glance.layout.padding
+import androidx.glance.layout.width
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import kotlinx.coroutines.flow.first
 
-class NotesWidget : GlanceAppWidget() {
+/**
+ * Sticky-note palette: very light yellow by day, dark olive at night. Fixed colors instead of
+ * GlanceTheme's dynamic ones, because text must stay readable against the yellow either way.
+ */
+private object NoteColors {
+    val background = ColorProvider(day = Color(0xFFFFF9C4), night = Color(0xFF3B3618))
+    val text = ColorProvider(day = Color(0xFF2B2600), night = Color(0xFFF2EAC0))
+    val secondaryText = ColorProvider(day = Color(0xFF5C5530), night = Color(0xFFCFC69A))
+    val problemText = ColorProvider(day = Color(0xFFB3261E), night = Color(0xFFF2B8B5))
+    val refreshButton = ColorProvider(day = Color(0xFFF6C6C1), night = Color(0xFF5E2E2A))
+    val detailsButton = ColorProvider(day = Color(0xFFC5E5C1), night = Color(0xFF2E4E2B))
+}
 
-    // Responsive: Glance renders one layout per size up front and the launcher picks the closest
-    // match, so resizing doesn't need a recomposition (unlike SizeMode.Exact).
-    override val sizeMode = SizeMode.Responsive(setOf(SMALL, MEDIUM, LARGE))
+class NotesWidget : GlanceAppWidget() {
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val repository = NotesRepository(context)
@@ -56,20 +63,12 @@ class NotesWidget : GlanceAppWidget() {
             // Glance keeps the session alive for a short while, so live DataStore changes show
             // directly; RefreshWorker's updateAll() covers the case where the session has ended.
             val state by repository.state.collectAsState(initial)
-            GlanceTheme {
-                WidgetContent(state)
-            }
+            WidgetContent(state)
         }
-    }
-
-    companion object {
-        private val SMALL = DpSize(110.dp, 110.dp)
-        private val MEDIUM = DpSize(250.dp, 110.dp)
-        private val LARGE = DpSize(250.dp, 250.dp)
     }
 }
 
-/** Tapping the refresh glyph in the header. */
+/** Tapping the refresh button. */
 class RefreshAction : ActionCallback {
     override suspend fun onAction(context: Context, glanceId: GlanceId, parameters: ActionParameters) {
         RefreshWorker.refreshNow(context)
@@ -78,83 +77,108 @@ class RefreshAction : ActionCallback {
 
 @Composable
 private fun WidgetContent(state: WidgetState) {
-    val size = LocalSize.current
-    val showPreview = size.width >= 200.dp
-    val previewLines = if (size.height >= 200.dp) 2 else 1
-    val showTime = size.width >= 200.dp
-    val openSite = NotesRepository.baseUrl()?.let {
-        actionStartActivity(Intent(Intent.ACTION_VIEW, it.toString().toUri()))
-    }
-
     Column(
         modifier = GlanceModifier
             .fillMaxSize()
             .appWidgetBackground()
-            .background(GlanceTheme.colors.widgetBackground)
+            .background(NoteColors.background)
             .cornerRadius(16.dp)
             .padding(horizontal = 12.dp, vertical = 10.dp),
     ) {
-        Header(state, openSite)
-        Spacer(GlanceModifier.height(6.dp))
+        Header(state)
+        Spacer(GlanceModifier.height(18.dp))
+        // defaultWeight: the list takes whatever height is left, keeping the buttons at the bottom.
         if (state.notes.isEmpty()) {
-            EmptyState(state.status)
+            EmptyState(state.status, GlanceModifier.defaultWeight())
         } else {
-            // LazyColumn is backed by a RemoteViews ListView, which swallows clicks meant for its
-            // parent. Each row therefore needs its own clickable.
-            LazyColumn(modifier = GlanceModifier.fillMaxSize()) {
-                items(state.notes) { note ->
-                    NoteRow(note, showPreview, previewLines, showTime, openSite)
-                }
+            LazyColumn(modifier = GlanceModifier.fillMaxWidth().defaultWeight()) {
+                items(state.notes) { note -> NoteRow(note) }
             }
         }
+        Spacer(GlanceModifier.height(8.dp))
+        ButtonRow()
     }
 }
 
 @Composable
-private fun Header(state: WidgetState, openSite: Action?) {
-    Row(
-        modifier = GlanceModifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
+private fun Header(state: WidgetState) {
+    Column(
+        modifier = GlanceModifier.fillMaxWidth().padding(horizontal = 2.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Column(
-            modifier = GlanceModifier.defaultWeight().let { if (openSite != null) it.clickable(openSite) else it },
-        ) {
+        Text(
+            text = "Raphi's Notes",
+            style = TextStyle(fontWeight = FontWeight.Bold, fontSize = 22.sp, color = NoteColors.text),
+            maxLines = 1,
+        )
+        problemLine(state.status)?.let {
             Text(
-                text = "Notes",
-                style = TextStyle(fontWeight = FontWeight.Bold, fontSize = 15.sp, color = GlanceTheme.colors.primary),
+                text = it,
+                style = TextStyle(fontSize = 11.sp, color = NoteColors.problemText),
                 maxLines = 1,
             )
-            statusLine(state)?.let { (text, isProblem) ->
-                Text(
-                    text = text,
-                    style = TextStyle(
-                        fontSize = 11.sp,
-                        color = if (isProblem) GlanceTheme.colors.error else GlanceTheme.colors.onSurfaceVariant,
-                    ),
-                    maxLines = 1,
-                )
-            }
         }
+    }
+}
+
+/** Refresh on the left, Details (opens the notes site) on the right. The only clickable elements. */
+@Composable
+private fun ButtonRow() {
+    Row(modifier = GlanceModifier.fillMaxWidth()) {
+        WidgetButton(
+            "Refresh",
+            actionRunCallback<RefreshAction>(),
+            NoteColors.refreshButton,
+            GlanceModifier.defaultWeight(),
+        )
+        NotesRepository.baseUrl()?.let { url ->
+            Spacer(GlanceModifier.width(8.dp))
+            WidgetButton(
+                "Details",
+                actionStartActivity(Intent(Intent.ACTION_VIEW, url.toString().toUri())),
+                NoteColors.detailsButton,
+                GlanceModifier.defaultWeight(),
+            )
+        }
+    }
+}
+
+/** Rounded rectangle, 44dp tall: big enough to hit reliably with a thumb. */
+@Composable
+private fun WidgetButton(
+    label: String,
+    onClick: Action,
+    // Glance's ColorProvider type; the ColorProvider imported above is its day/night factory function.
+    color: androidx.glance.unit.ColorProvider,
+    modifier: GlanceModifier,
+) {
+    Box(
+        modifier = modifier
+            .height(44.dp)
+            .cornerRadius(10.dp)
+            .background(color)
+            .clickable(onClick),
+        contentAlignment = Alignment.Center,
+    ) {
         Text(
-            text = "↻",
-            style = TextStyle(fontSize = 18.sp, color = GlanceTheme.colors.primary),
-            modifier = GlanceModifier.padding(start = 8.dp, end = 2.dp).clickable(actionRunCallback<RefreshAction>()),
+            text = label,
+            style = TextStyle(fontWeight = FontWeight.Bold, fontSize = 15.sp, color = NoteColors.text),
+            maxLines = 1,
         )
     }
 }
 
-/** Subtitle under the header, and whether it describes a problem (rendered in the error color). */
-private fun statusLine(state: WidgetState): Pair<String, Boolean>? = when (state.status) {
-    SyncStatus.NeverSynced -> null
-    SyncStatus.Ok -> state.lastSuccessMillis?.let { "Updated ${relativeTime(it)}" to false }
-    SyncStatus.Offline -> "Offline · showing cached notes" to true
-    SyncStatus.BadToken -> "Check token (server returned 403)" to true
-    SyncStatus.Error -> "Couldn't refresh" to true
-    SyncStatus.NotConfigured -> "Not configured" to true
+/** Shown under "Notes" only when the last refresh failed; nothing when all is well. */
+private fun problemLine(status: SyncStatus): String? = when (status) {
+    SyncStatus.NeverSynced, SyncStatus.Ok -> null
+    SyncStatus.Offline -> "Offline · showing cached notes"
+    SyncStatus.BadToken -> "Check token (server returned 403)"
+    SyncStatus.Error -> "Couldn't refresh"
+    SyncStatus.NotConfigured -> "Not configured"
 }
 
 @Composable
-private fun EmptyState(status: SyncStatus) {
+private fun EmptyState(status: SyncStatus, modifier: GlanceModifier) {
     val message = when (status) {
         SyncStatus.NeverSynced -> "Loading…"
         SyncStatus.Ok -> "No notes yet"
@@ -163,64 +187,20 @@ private fun EmptyState(status: SyncStatus) {
         SyncStatus.Error -> "Couldn't load notes."
         SyncStatus.NotConfigured -> "Set notes.baseUrl and notes.widgetToken in local.properties, then rebuild."
     }
-    Box(modifier = GlanceModifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+    Box(modifier = modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
         Text(
             text = message,
-            style = TextStyle(fontSize = 13.sp, color = GlanceTheme.colors.onSurfaceVariant),
+            style = TextStyle(fontSize = 13.sp, color = NoteColors.secondaryText),
         )
     }
 }
 
 @Composable
-private fun NoteRow(
-    note: Note,
-    showPreview: Boolean,
-    previewLines: Int,
-    showTime: Boolean,
-    openSite: Action?,
-) {
-    Column(
-        modifier = GlanceModifier
-            .fillMaxWidth()
-            .padding(vertical = 5.dp)
-            .let { if (openSite != null) it.clickable(openSite) else it },
-    ) {
-        Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text = note.title.ifBlank { "Untitled" },
-                style = TextStyle(fontWeight = FontWeight.Bold, fontSize = 14.sp, color = GlanceTheme.colors.onSurface),
-                maxLines = 1,
-                modifier = GlanceModifier.defaultWeight(),
-            )
-            if (showTime) {
-                note.updatedMillis?.let {
-                    Text(
-                        text = relativeTime(it),
-                        style = TextStyle(fontSize = 11.sp, color = GlanceTheme.colors.onSurfaceVariant),
-                        maxLines = 1,
-                        modifier = GlanceModifier.padding(start = 8.dp),
-                    )
-                }
-            }
-        }
-        if (showPreview && note.preview.isNotBlank()) {
-            Text(
-                text = note.preview,
-                style = TextStyle(fontSize = 12.sp, color = GlanceTheme.colors.onSurfaceVariant),
-                maxLines = previewLines,
-            )
-        }
-    }
+private fun NoteRow(note: Note) {
+    Text(
+        text = note.title.ifBlank { "Untitled" },
+        style = TextStyle(fontWeight = FontWeight.Bold, fontSize = 14.sp, color = NoteColors.text),
+        maxLines = 2,
+        modifier = GlanceModifier.fillMaxWidth().padding(top = 5.dp, bottom = 5.dp, end = 6.dp),
+    )
 }
-
-/**
- * "5 min. ago" style. Computed at render time, so it only advances when the widget is re-rendered
- * (each refresh, roughly every 15 minutes). Good enough for a glanceable list.
- */
-private fun relativeTime(millis: Long): String =
-    DateUtils.getRelativeTimeSpanString(
-        millis,
-        System.currentTimeMillis(),
-        DateUtils.MINUTE_IN_MILLIS,
-        DateUtils.FORMAT_ABBREV_RELATIVE,
-    ).toString()

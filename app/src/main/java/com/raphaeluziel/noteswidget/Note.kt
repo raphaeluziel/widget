@@ -1,32 +1,13 @@
 package com.raphaeluziel.noteswidget
 
 import kotlinx.serialization.Serializable
-import java.time.LocalDateTime
-import java.time.OffsetDateTime
-import java.time.ZoneId
-import java.time.format.DateTimeParseException
 
-/** One entry of `GET <base>/widget/recent/`. Field names match the Django JSON contract. */
+/**
+ * One entry of `GET <base>/widget/recent/`: just the note text. Any other fields the server
+ * sends (older servers also sent `preview` and `updated`) are skipped by `ignoreUnknownKeys`.
+ */
 @Serializable
-data class Note(
-    val title: String,
-    val preview: String,
-    /** ISO-8601 from Django's `isoformat()`, e.g. `2026-10-26T09:15:02.123456+00:00`. */
-    val updated: String,
-) {
-    /** Epoch millis of [updated], or null if the server sent something unparseable. */
-    val updatedMillis: Long?
-        get() = try {
-            OffsetDateTime.parse(updated).toInstant().toEpochMilli()
-        } catch (_: DateTimeParseException) {
-            // Django emits naive datetimes when USE_TZ = False; assume device time zone.
-            try {
-                LocalDateTime.parse(updated).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
-            } catch (_: DateTimeParseException) {
-                null
-            }
-        }
-}
+data class Note(val title: String)
 
 @Serializable
 data class NotesResponse(val notes: List<Note>)
