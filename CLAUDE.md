@@ -31,12 +31,20 @@ The server side already exists (or is being added in the Django repo). The widge
 GET https://<MY_DOMAIN>/<notes-url-prefix>/widget/recent/?token=<TOKEN>
 200 OK
 {
+  "events": [
+    {"title": "Dentist", "time": "9:00 AM", "color": "#d32f2f"}
+  ],
   "notes": [
     {"title": "Buy milk", "size": "large", "color": "red", "bold": true, "italic": false}
   ]
 }
 403 -> bad/missing token
 ```
+
+- `events`: today's calendar events, in display order; empty when nothing's on. `time` is ready to
+  display ("9:00 AM", "Until 3:00 PM", "All day"); `color` is any "#rrggbb", used as is in both
+  modes, and an invalid value draws the dot in the secondary text colour. All fields default to "",
+  and `events` defaults to empty, so older servers and cached state still decode.
 
 - Every note is returned (any length), in the order arranged on the website. The widget never sorts.
 - `size`: "small" | "normal" | "large" | "xlarge" -> 12 / 14 / 17 / 20 sp.
@@ -62,7 +70,7 @@ widget can't log in. The token is its only auth. Unset `WIDGET_TOKEN` on the ser
 
 ## Requirements
 
-1. **Widget UI (Glance):** a scrolling list of all notes in the order received, showing only the note text (`title`, one line), styled per note by `size`, `color`, `bold` and `italic`. No details/preview and no per-note time. The header is "Raphi's Notes", centered, in a bigger font than the notes (22sp vs 14sp), with 18dp of space below it. No "updated X ago" line either; the header shows a subtle problem line only when a refresh failed ("offline", "couldn't refresh", "check token"). Handle empty, loading, and error states gracefully (keep showing last cached data).
+1. **Widget UI (Glance):** one scrolling list: today's events first (a small dot in the event's colour, then the time in the secondary text colour, then the title; 14sp, not bold, one line), an 8dp gap only when there are both events and notes, then all notes in the order received, showing only the note text (`title`, one line), styled per note by `size`, `color`, `bold` and `italic`. No details/preview and no per-note time. The header is "Raphi's Notes", centered, in a bigger font than the notes (22sp vs 14sp), with 18dp of space below it. No "updated X ago" line either; the header shows a subtle problem line only when a refresh failed ("offline", "couldn't refresh", "check token"). Handle empty, loading, and error states gracefully (keep showing last cached data).
 2. **Refresh:** `PeriodicWorkRequest` via WorkManager (15 minutes is the minimum interval). Also refresh once when the widget is first added. The worker fetches JSON, saves it to Glance state/DataStore, then calls `GlanceAppWidget.update`.
 3. **Caching:** persist the last successful response so the widget still shows notes with no network.
 4. **Tap actions:** only two 44dp-tall rounded-rectangle buttons in a row at the bottom of the widget are clickable: "Refresh" (left, light red) and "Details" (right, light green), which opens the notes site (`notes.baseUrl`) in the browser via `Intent.ACTION_VIEW`. Tapping notes or the header does nothing.

@@ -64,7 +64,8 @@ class NotesRepository(context: Context) {
             val previous = prefs[STATE_KEY]?.let { decodeState(it) } ?: WidgetState()
             val next = when (result) {
                 is FetchResult.Success -> WidgetState(
-                    notes = result.notes,
+                    notes = result.response.notes,
+                    events = result.response.events,
                     status = SyncStatus.Ok,
                     lastSuccessMillis = now,
                     lastAttemptMillis = now,
@@ -92,7 +93,7 @@ class NotesRepository(context: Context) {
                         Log.w(TAG, "Refresh failed: HTTP ${response.code}")
                         FetchResult.Failure(SyncStatus.Error)
                     }
-                    else -> FetchResult.Success(json.decodeFromString<NotesResponse>(response.body.string()).notes)
+                    else -> FetchResult.Success(json.decodeFromString<NotesResponse>(response.body.string()))
                 }
             }
         } catch (e: IOException) {
@@ -115,7 +116,7 @@ class NotesRepository(context: Context) {
         }
 
     private sealed interface FetchResult {
-        data class Success(val notes: List<Note>) : FetchResult
+        data class Success(val response: NotesResponse) : FetchResult
         data class Failure(val status: SyncStatus) : FetchResult
     }
 

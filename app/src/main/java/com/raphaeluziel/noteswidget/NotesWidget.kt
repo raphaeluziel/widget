@@ -144,10 +144,15 @@ private fun WidgetContent(state: WidgetState, dark: Boolean) {
         Header(state, dark, palette)
         Spacer(GlanceModifier.height(18.dp))
         // defaultWeight: the list takes whatever height is left, keeping the buttons at the bottom.
-        if (state.notes.isEmpty()) {
+        if (state.notes.isEmpty() && state.events.isEmpty()) {
             EmptyState(state.status, palette, GlanceModifier.defaultWeight())
         } else {
+            // Today's events and the notes share one scrolling list, events first.
             LazyColumn(modifier = GlanceModifier.fillMaxWidth().defaultWeight()) {
+                items(state.events) { event -> EventRow(event, palette) }
+                if (state.events.isNotEmpty() && state.notes.isNotEmpty()) {
+                    item { Spacer(GlanceModifier.height(8.dp)) }
+                }
                 items(state.notes) { note -> NoteRow(note, palette) }
             }
         }
@@ -272,6 +277,49 @@ private fun EmptyState(status: SyncStatus, palette: Palette, modifier: GlanceMod
             style = TextStyle(fontSize = 13.sp, color = palette.secondaryText),
         )
     }
+}
+
+/** One of today's events: a dot in the event's colour, the time, then the title. Server order. */
+@Composable
+private fun EventRow(event: Event, palette: Palette) {
+    Row(
+        modifier = GlanceModifier.fillMaxWidth().padding(top = 5.dp, bottom = 5.dp, end = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = GlanceModifier
+                .size(8.dp)
+                .cornerRadius(4.dp)
+                .background(eventDotColor(event.color, palette)),
+        ) {}
+        Spacer(GlanceModifier.width(8.dp))
+        if (event.time.isNotBlank()) {
+            Text(
+                text = event.time,
+                style = TextStyle(fontSize = 14.sp, color = palette.secondaryText),
+                maxLines = 1,
+            )
+            Spacer(GlanceModifier.width(6.dp))
+        }
+        Text(
+            text = event.title.ifBlank { "Untitled" },
+            style = TextStyle(fontSize = 14.sp, color = palette.text),
+            maxLines = 1,
+            modifier = GlanceModifier.defaultWeight(),
+        )
+    }
+}
+
+private val HEX_COLOR = Regex("#[0-9a-fA-F]{6}")
+
+/**
+ * The event's own "#rrggbb", used as is in both light and dark mode. Anything that isn't a valid
+ * "#rrggbb" falls back to the secondary text colour.
+ */
+private fun eventDotColor(color: String, palette: Palette): ColorProvider {
+    val hex = color.trim()
+    if (!HEX_COLOR.matches(hex)) return palette.secondaryText
+    return ColorProvider(Color(0xFF000000 or hex.substring(1).toLong(16)))
 }
 
 /** Notes render in the order the server sends them (my own arrangement), never re-sorted. */
