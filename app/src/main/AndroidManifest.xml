@@ -21,6 +21,16 @@
             </intent-filter>
         </activity>
 
+        <!-- Prototype pop-up for a tapped note/event. Its own empty task affinity and
+             excludeFromRecents keep it from dragging MainActivity along or lingering in Recents. -->
+        <activity
+            android:name=".NoteDetailActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:theme="@style/Theme.NotesWidget.Popup" />
+
         <receiver
             android:name=".NotesWidgetReceiver"
             android:exported="true"

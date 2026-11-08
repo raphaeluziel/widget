@@ -1,4 +1,13 @@
 <resources>
     <!-- Compose draws the UI; this only sets the window background before the first frame. -->
     <style name="Theme.NotesWidget" parent="android:Theme.Material.Light.NoActionBar" />
+
+    <!-- Prototype note pop-up: a see-through window, so the home screen shows behind the dimmed
+         backdrop that NoteDetailActivity draws. Same in day and night (it follows the widget's toggle). -->
+    <style name="Theme.NotesWidget.Popup" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowAnimationStyle">@android:style/Animation.Dialog</item>
+        <item name="android:windowNoTitle">true</item>
+    </style>
 </resources>

@@ -14,6 +14,8 @@ import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.action.Action
 import androidx.glance.action.ActionParameters
+import androidx.glance.action.actionParametersOf
+import androidx.glance.action.actionStartActivity
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.action.ActionCallback
@@ -283,7 +285,10 @@ private fun EmptyState(status: SyncStatus, palette: Palette, modifier: GlanceMod
 @Composable
 private fun EventRow(event: Event, palette: Palette) {
     Row(
-        modifier = GlanceModifier.fillMaxWidth().padding(top = 5.dp, bottom = 5.dp, end = 6.dp),
+        modifier = GlanceModifier
+            .fillMaxWidth()
+            .clickable(openDetails(NoteDetailActivity.KIND_EVENT, event.title, event.time, event.color))
+            .padding(top = 5.dp, bottom = 5.dp, end = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
@@ -310,6 +315,20 @@ private fun EventRow(event: Event, palette: Palette) {
     }
 }
 
+private val KIND_KEY = ActionParameters.Key<String>(NoteDetailActivity.EXTRA_KIND)
+private val TITLE_KEY = ActionParameters.Key<String>(NoteDetailActivity.EXTRA_TITLE)
+private val TIME_KEY = ActionParameters.Key<String>(NoteDetailActivity.EXTRA_TIME)
+private val COLOR_KEY = ActionParameters.Key<String>(NoteDetailActivity.EXTRA_COLOR)
+
+/**
+ * PROTOTYPE: tapping a row opens NoteDetailActivity, a pop-up with made-up details. Glance turns
+ * the parameters into intent extras and gives each row in the list its own click.
+ */
+private fun openDetails(kind: String, title: String, time: String = "", color: String = ""): Action =
+    actionStartActivity<NoteDetailActivity>(
+        actionParametersOf(KIND_KEY to kind, TITLE_KEY to title, TIME_KEY to time, COLOR_KEY to color),
+    )
+
 private val HEX_COLOR = Regex("#[0-9a-fA-F]{6}")
 
 /**
@@ -334,7 +353,10 @@ private fun NoteRow(note: Note, palette: Palette) {
             color = noteColor(note.color, palette),
         ),
         maxLines = 1,
-        modifier = GlanceModifier.fillMaxWidth().padding(top = 5.dp, bottom = 5.dp, end = 6.dp),
+        modifier = GlanceModifier
+            .fillMaxWidth()
+            .clickable(openDetails(NoteDetailActivity.KIND_NOTE, note.title))
+            .padding(top = 5.dp, bottom = 5.dp, end = 6.dp),
     )
 }
 
