@@ -83,7 +83,12 @@ class NotesRepository(context: Context) {
 
     private suspend fun fetch(): FetchResult = withContext(Dispatchers.IO) {
         val url = endpointUrl() ?: return@withContext FetchResult.Failure(SyncStatus.NotConfigured)
-        val request = Request.Builder().url(url).header("Accept", "application/json").build()
+        // The token goes in a header, never in the URL: URLs end up in server access logs.
+        val request = Request.Builder()
+            .url(url)
+            .header("Accept", "application/json")
+            .header(TOKEN_HEADER, BuildConfig.NOTES_WIDGET_TOKEN)
+            .build()
         try {
             httpClient.newCall(request).execute().use { response ->
                 when {
@@ -132,12 +137,12 @@ class NotesRepository(context: Context) {
         val isConfigured: Boolean
             get() = baseUrl() != null && BuildConfig.NOTES_WIDGET_TOKEN.isNotBlank()
 
+        /** Header the server reads the widget token from (same as the desktop widget's). */
+        private const val TOKEN_HEADER = "X-Widget-Token"
+
         private fun endpointUrl(): HttpUrl? {
             if (!isConfigured) return null
-            return baseUrl()!!.newBuilder()
-                .addPathSegments("widget/recent/")
-                .addQueryParameter("token", BuildConfig.NOTES_WIDGET_TOKEN)
-                .build()
+            return baseUrl()!!.newBuilder().addPathSegments("widget/recent/").build()
         }
     }
 }

@@ -33,16 +33,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.net.toUri
 import kotlin.math.max
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 
 /**
- * PROTOTYPE: the pop-up shown when a note or event in the widget is tapped. The details are made
- * up here, because the server doesn't send any yet; this is only for trying out the look and feel.
+ * The pop-up shown when a note or event in the widget is tapped: the title, for events the time
+ * and location, the details text, and Open/Close buttons. Open goes to the item's own page.
  *
  * Widgets can't show real dialogs, so this is a translucent activity that draws a dimmed backdrop
  * and a sticky-note card over the home screen. Tapping outside the card or Close dismisses it.
@@ -55,6 +57,9 @@ class NoteDetailActivity : ComponentActivity() {
         val title = intent.getStringExtra(EXTRA_TITLE).orEmpty().ifBlank { "Untitled" }
         val time = intent.getStringExtra(EXTRA_TIME).orEmpty()
         val color = intent.getStringExtra(EXTRA_COLOR).orEmpty()
+        val details = intent.getStringExtra(EXTRA_DETAILS).orEmpty().trim()
+        val location = intent.getStringExtra(EXTRA_LOCATION).orEmpty().trim()
+        val openUrl = openTarget(intent.getStringExtra(EXTRA_URL).orEmpty())
         val repository = NotesRepository(this)
         setContent {
             // Follows the widget's own light/dark toggle, not the phone's theme.
@@ -64,11 +69,11 @@ class NoteDetailActivity : ComponentActivity() {
                 title = title,
                 time = time,
                 eventColor = color,
+                location = location,
+                details = details,
                 colors = if (dark) DarkDetailColors else LightDetailColors,
                 onOpenSite = {
-                    NotesRepository.baseUrl()?.let {
-                        startActivity(Intent(Intent.ACTION_VIEW, it.toString().toUri()))
-                    }
+                    openUrl?.let { startActivity(Intent(Intent.ACTION_VIEW, it.toUri())) }
                     finish()
                 },
                 onClose = ::finish,
@@ -83,9 +88,22 @@ class NoteDetailActivity : ComponentActivity() {
         const val EXTRA_TITLE = "title"
         const val EXTRA_TIME = "time"
         const val EXTRA_COLOR = "color"
+        const val EXTRA_DETAILS = "details"
+        const val EXTRA_LOCATION = "location"
+        const val EXTRA_URL = "url"
         const val KIND_NOTE = "note"
         const val KIND_EVENT = "event"
     }
+}
+
+/**
+ * Where Open goes: the item's own link if it's https on the same site as notes.baseUrl, otherwise
+ * the notes site itself. The check keeps a bad or unexpected link from opening anywhere else.
+ */
+private fun openTarget(itemUrl: String): String? {
+    val base = NotesRepository.baseUrl() ?: return null
+    val url = itemUrl.trim().toHttpUrlOrNull()
+    return if (url != null && url.isHttps && url.host == base.host) url.toString() else base.toString()
 }
 
 /** Same sticky-note colours as the widget (see Palette in NotesWidget.kt). */
@@ -113,6 +131,8 @@ private fun DetailPopup(
     title: String,
     time: String,
     eventColor: String,
+    location: String,
+    details: String,
     colors: DetailColors,
     onOpenSite: () -> Unit,
     onClose: () -> Unit,
@@ -151,14 +171,20 @@ private fun DetailPopup(
                     Text(text = time, color = colors.secondaryText, fontSize = 15.sp)
                 }
             }
+            if (location.isNotEmpty()) {
+                Spacer(Modifier.height(4.dp))
+                Text(text = location, color = colors.secondaryText, fontSize = 15.sp)
+            }
             Spacer(Modifier.height(14.dp))
-            // Long details scroll inside the card instead of pushing the buttons off screen.
+            // Long details (the server caps them at 2,000 characters) scroll inside the card
+            // instead of pushing the buttons off screen.
             Column(Modifier.heightIn(max = 320.dp).verticalScroll(rememberScrollState())) {
                 Text(
-                    text = fakeDetails(kind, title),
-                    color = colors.text,
+                    text = details.ifEmpty { "No details" },
+                    color = if (details.isEmpty()) colors.secondaryText else colors.text,
                     fontSize = 15.sp,
                     lineHeight = 21.sp,
+                    fontStyle = if (details.isEmpty()) FontStyle.Italic else FontStyle.Normal,
                 )
             }
             Spacer(Modifier.height(18.dp))
@@ -205,16 +231,3 @@ private fun parseHex(color: String): Color? {
     if (!Regex("#[0-9a-fA-F]{6}").matches(hex)) return null
     return Color(0xFF000000 or hex.substring(1).toLong(16))
 }
-
-/** Placeholder text, so the pop-up can be judged with a realistic amount of content. */
-private fun fakeDetails(kind: String, title: String): String =
-    if (kind == NoteDetailActivity.KIND_EVENT) {
-        "Location: 123 Example Street\n\n" +
-            "Reminder 30 minutes before. Bring the paperwork from last time and arrive a few minutes early. " +
-            "These details are made up so you can see how \"$title\" would look with more information."
-    } else {
-        "This is where the note's details would go. Right now the widget only receives the note's text, " +
-            "so these lines are made up so you can judge the look of the pop-up.\n\n" +
-            "A second paragraph shows how longer details wrap and scroll: lorem ipsum dolor sit amet, " +
-            "consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."
-    }

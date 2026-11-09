@@ -16,6 +16,10 @@ data class Note(
     val color: String = "",
     val bold: Boolean = false,
     val italic: Boolean = false,
+    /** Plain text shown in the pop-up when the note is tapped; "" when there are none. */
+    val details: String = "",
+    /** https link to this note on the website, for the pop-up's Open button; "" if none. */
+    val url: String = "",
 )
 
 /** One of today's calendar events, shown above the notes. Every field has a default. */
@@ -26,6 +30,12 @@ data class Event(
     val time: String = "",
     /** "#rrggbb", any colour; anything else draws the dot in the secondary text colour. */
     val color: String = "",
+    /** Plain text shown in the pop-up; "" when none. */
+    val details: String = "",
+    /** Shown in the pop-up under the time; "" when none. */
+    val location: String = "",
+    /** https link to the event in the planner, for the pop-up's Open button; "" if none. */
+    val url: String = "",
 )
 
 /** `events` defaults to empty so a server that doesn't send it still decodes. */

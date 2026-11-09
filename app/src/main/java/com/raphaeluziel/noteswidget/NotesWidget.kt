@@ -287,7 +287,7 @@ private fun EventRow(event: Event, palette: Palette) {
     Row(
         modifier = GlanceModifier
             .fillMaxWidth()
-            .clickable(openDetails(NoteDetailActivity.KIND_EVENT, event.title, event.time, event.color))
+            .clickable(openDetails(event))
             .padding(top = 5.dp, bottom = 5.dp, end = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -319,14 +319,36 @@ private val KIND_KEY = ActionParameters.Key<String>(NoteDetailActivity.EXTRA_KIN
 private val TITLE_KEY = ActionParameters.Key<String>(NoteDetailActivity.EXTRA_TITLE)
 private val TIME_KEY = ActionParameters.Key<String>(NoteDetailActivity.EXTRA_TIME)
 private val COLOR_KEY = ActionParameters.Key<String>(NoteDetailActivity.EXTRA_COLOR)
+private val DETAILS_KEY = ActionParameters.Key<String>(NoteDetailActivity.EXTRA_DETAILS)
+private val LOCATION_KEY = ActionParameters.Key<String>(NoteDetailActivity.EXTRA_LOCATION)
+private val URL_KEY = ActionParameters.Key<String>(NoteDetailActivity.EXTRA_URL)
 
 /**
- * PROTOTYPE: tapping a row opens NoteDetailActivity, a pop-up with made-up details. Glance turns
- * the parameters into intent extras and gives each row in the list its own click.
+ * Tapping a row opens NoteDetailActivity, the pop-up with the item's details. Glance turns the
+ * parameters into intent extras and gives each row in the list its own click. Everything comes
+ * from the cached state, so the pop-up works offline too.
  */
-private fun openDetails(kind: String, title: String, time: String = "", color: String = ""): Action =
+private fun openDetails(note: Note): Action =
     actionStartActivity<NoteDetailActivity>(
-        actionParametersOf(KIND_KEY to kind, TITLE_KEY to title, TIME_KEY to time, COLOR_KEY to color),
+        actionParametersOf(
+            KIND_KEY to NoteDetailActivity.KIND_NOTE,
+            TITLE_KEY to note.title,
+            DETAILS_KEY to note.details,
+            URL_KEY to note.url,
+        ),
+    )
+
+private fun openDetails(event: Event): Action =
+    actionStartActivity<NoteDetailActivity>(
+        actionParametersOf(
+            KIND_KEY to NoteDetailActivity.KIND_EVENT,
+            TITLE_KEY to event.title,
+            TIME_KEY to event.time,
+            COLOR_KEY to event.color,
+            DETAILS_KEY to event.details,
+            LOCATION_KEY to event.location,
+            URL_KEY to event.url,
+        ),
     )
 
 private val HEX_COLOR = Regex("#[0-9a-fA-F]{6}")
@@ -355,7 +377,7 @@ private fun NoteRow(note: Note, palette: Palette) {
         maxLines = 1,
         modifier = GlanceModifier
             .fillMaxWidth()
-            .clickable(openDetails(NoteDetailActivity.KIND_NOTE, note.title))
+            .clickable(openDetails(note))
             .padding(top = 5.dp, bottom = 5.dp, end = 6.dp),
     )
 }

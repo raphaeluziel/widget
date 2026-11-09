@@ -28,14 +28,18 @@ I want the most up-to-date versions of all software. Do **not** pin versions fro
 The server side already exists (or is being added in the Django repo). The widget must consume exactly this:
 
 ```
-GET https://<MY_DOMAIN>/<notes-url-prefix>/widget/recent/?token=<TOKEN>
+GET https://<MY_DOMAIN>/<notes-url-prefix>/widget/recent/
+X-Widget-Token: <TOKEN>
 200 OK
 {
   "events": [
-    {"title": "Dentist", "time": "9:00 AM", "color": "#d32f2f"}
+    {"title": "Dentist", "time": "9:00 AM", "color": "#d32f2f",
+     "details": "Bring the forms", "location": "12 Main St",
+     "url": "https://<MY_DOMAIN>/planner/..."}
   ],
   "notes": [
-    {"title": "Buy milk", "size": "large", "color": "red", "bold": true, "italic": false}
+    {"title": "Buy milk", "size": "large", "color": "red", "bold": true, "italic": false,
+     "details": "Oat, 2 cartons", "url": "https://<MY_DOMAIN>/notes/..."}
   ]
 }
 403 -> bad/missing token
@@ -51,9 +55,12 @@ GET https://<MY_DOMAIN>/<notes-url-prefix>/widget/recent/?token=<TOKEN>
 - `color`: "" (default text color) | "red" | "orange" | "green" | "blue" | "purple" | "pink" | "gray";
   day uses the website's hex values, night lighter versions.
 - `bold`, `italic`: booleans for the whole note.
+- `details` (notes and events), `location` (events) and `url` (both): shown only in the pop-up when
+  an item is tapped. `details` is plain text (the server caps it at 2,000 characters); `url` links
+  to that item on the website. All default to "".
 
-The widget reads `title`, `size`, `color`, `bold` and `italic`. All but `title` have defaults
-("normal", "", false, false), and unknown size/color values render as the default, so older
+The widget reads `title`, `size`, `color`, `bold`, `italic`, `details` and `url` for notes. All but
+`title` have defaults ("normal", "", false, false, "", ""), and unknown size/color values render as the default, so older
 servers and cached state still decode. Older servers also sent `preview` and `updated`; the app
 ignores unknown fields, so extra fields never break it, but removing `title` or `notes` would.
 The authoritative field list is the "Android Home-Screen Widget" section of the Django notes CLAUDE.md.
@@ -70,10 +77,10 @@ widget can't log in. The token is its only auth. Unset `WIDGET_TOKEN` on the ser
 
 ## Requirements
 
-1. **Widget UI (Glance):** one scrolling list: today's events first (a small dot in the event's colour, then the time in the secondary text colour, then the title; 14sp, not bold, one line), an 8dp gap only when there are both events and notes, then all notes in the order received, showing only the note text (`title`, one line), styled per note by `size`, `color`, `bold` and `italic`. No details/preview and no per-note time. The header is "Raphi's Notes", centered, in a bigger font than the notes (22sp vs 14sp), with 18dp of space below it. No "updated X ago" line either; the header shows a subtle problem line only when a refresh failed ("offline", "couldn't refresh", "check token"). Handle empty, loading, and error states gracefully (keep showing last cached data).
+1. **Widget UI (Glance):** one scrolling list: today's events first (a small dot in the event's colour, then the time in the secondary text colour, then the title; 14sp, not bold, one line), an 8dp gap only when there are both events and notes, then all notes in the order received, showing only the note text (`title`, one line), styled per note by `size`, `color`, `bold` and `italic`. No details/preview in the list (they're in the tap pop-up) and no per-note time. The header is "Raphi's Notes", centered, in a bigger font than the notes (22sp vs 14sp), with 18dp of space below it. No "updated X ago" line either; the header shows a subtle problem line only when a refresh failed ("offline", "couldn't refresh", "check token"). Handle empty, loading, and error states gracefully (keep showing last cached data).
 2. **Refresh:** `PeriodicWorkRequest` via WorkManager (15 minutes is the minimum interval). Also refresh once when the widget is first added. The worker fetches JSON, saves it to Glance state/DataStore, then calls `GlanceAppWidget.update`.
 3. **Caching:** persist the last successful response so the widget still shows notes with no network.
-4. **Tap actions:** only two 44dp-tall rounded-rectangle buttons in a row at the bottom of the widget are clickable: "Refresh" (left, light red) and "Details" (right, light green), which opens the notes site (`notes.baseUrl`) in the browser via `Intent.ACTION_VIEW`. Tapping notes or the header does nothing.
+4. **Tap actions:** two 44dp-tall rounded-rectangle buttons in a row at the bottom of the widget: "Refresh" (left, light red) and "Details" (right, light green), which opens the notes site (`notes.baseUrl`) in the browser via `Intent.ACTION_VIEW`. Tapping a note or event opens a pop-up (`NoteDetailActivity`, a translucent activity over the home screen, following the widget's light/dark choice): a sticky-note card centred on the middle of the widget, with no label, just the item's title, for events the coloured dot, time and location, then the details ("No details" if empty, scrolling if long), and two buttons, "Open" (the item's `url`, only if it's https on the notes site's host, otherwise `notes.baseUrl`) and "Close". Tapping outside the card also closes it. Tapping the header does nothing.
 5. **Config:** base URL and token come from `local.properties` (git-ignored) exposed through `BuildConfig` fields. A template `local.properties.example` should be committed with placeholder values.
 6. **Widget sizing and colors:** works at any home-screen size (the list simply fills the space). Sticky-note look with two fixed palettes: light (very light yellow `#FFF9C4`, dark text) and dark (dark olive, light text, lighter note colors). A round ☾/☀ button at the top right toggles the widget's own light/dark mode; the choice is saved in DataStore (separately from the notes cache), defaults to light, and ignores the phone's dark theme. Not Material You dynamic colors.
 
@@ -81,6 +88,7 @@ widget can't log in. The token is its only auth. Unset `WIDGET_TOKEN` on the ser
 
 - HTTPS only. Set `usesCleartextTraffic="false"`; never allow plain HTTP.
 - The token is effectively a password. **Never commit it**, never log it, never print the full request URL in logs. Add `local.properties` to `.gitignore`.
+- Send the token only in the `X-Widget-Token` header, never as a `?token=` query parameter: URLs end up in server access logs.
 - Never hardcode the real domain or token in source files.
 - If the server returns 403, show a clear "check token" state instead of retrying aggressively.
 
