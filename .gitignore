@@ -14,3 +14,6 @@ local.properties
 /.idea/navEditor.xml
 /.idea/assetWizardSettings.xml
 /.idea/deploymentTargetSelector.xml
+
+# Android Studio is no longer used
+/.idea/
