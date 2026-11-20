@@ -19,7 +19,7 @@ A small personal Android app whose only job is to provide a **home-screen widget
 
 I want the most up-to-date versions of all software. Do **not** pin versions from memory. When creating or updating the project:
 
-1. Look up the current stable releases of Android Studio's recommended Android Gradle Plugin (AGP), Kotlin, the Compose BOM, Glance, WorkManager, OkHttp, and kotlinx.serialization (official sources: developer.android.com/jetpack/androidx/releases, kotlinlang.org, Maven Central).
+1. Look up the current stable releases of the Android Gradle Plugin (AGP), Kotlin, the Compose BOM, Glance, WorkManager, OkHttp, and kotlinx.serialization (official sources: developer.android.com/jetpack/androidx/releases, kotlinlang.org, Maven Central).
 2. Set `compileSdk` and `targetSdk` to the latest stable API level; choose a reasonable `minSdk` for my phone (ask me for the Android version if it matters).
 3. Put every version in `libs.versions.toml`. Prefer stable over alpha/beta unless a required Glance feature only exists in a pre-release (tell me if so).
 
@@ -119,10 +119,18 @@ local.properties.example
 
 ## Build and run
 
-- Open the project in the latest stable Android Studio.
-- Run on my physical Android phone via USB or wireless debugging (widgets are easiest to test on a real device or a recent emulator image).
+- **No Android Studio.** The project lives in WSL at `~/widget` and is built from the terminal.
+- Toolchain: JDK 21 from apt (`/usr/lib/jvm/java-21-openjdk-amd64`), Android SDK in `/opt/android-sdk`
+  (env vars in `/etc/profile.d/android.sh`), SDK packages managed with Google's `android` CLI
+  (`android sdk list|install|update`; package paths use slashes, e.g. `platforms/android-37.0`).
+  `local.properties` has `sdk.dir=/opt/android-sdk`.
+- Build: `./gradlew assembleDebug` → `app/build/outputs/apk/debug/app-debug.apk`. Also `./gradlew lint`.
+- Install on my physical phone over **wireless debugging** (WSL can't see USB devices): already paired;
+  after each phone restart I turn Wireless debugging on, then `adb connect <ip>:<port>` (port changes
+  every time), then `android install app/build/outputs/apk/debug/app-debug.apk`
+  (fallback `adb install -r ...`). Full steps are in `README.md`.
+- Claude's sandbox can't download through Gradle/Java, so I run the first build after dependency changes myself.
 - After installing: long-press the home screen, Widgets, find the notes widget, and add it.
-- Useful commands: `./gradlew assembleDebug`, `./gradlew installDebug`, `./gradlew lint`.
 
 ## Out of scope (for now)
 
